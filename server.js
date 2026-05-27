@@ -79,13 +79,14 @@ async function buildProductList() {
     const batch = filtered.slice(i, i + 5);
     const batchResults = await Promise.all(batch.map(async (p) => {
       const sku = String(p.sku || '');
-      const apiItem = apiMap.get(sku);
+      const apiSku = sku.startsWith('IEL-') ? sku.slice(4) : sku;
+      const apiItem = apiMap.get(apiSku);
       if (apiItem) {
         return { wcId: p.id, name: p.name, sku, status: 'MATCHED', price: apiItem.price, instock: apiItem.instock, reserved: 0, brand: apiItem.brand };
       }
       try {
         const stockRes = await withRetry(() =>
-          axios.get(`https://intelectro.ge/api/v1/productstock/${sku}`, {
+          axios.get(`https://intelectro.ge/api/v1/productstock/${apiSku}`, {
             headers: {
               'api-key': '7f9e0bfcfa4d603db378ca6bb9d0dcd2',
               'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'
@@ -96,7 +97,7 @@ async function buildProductList() {
         );
         const sp = stockRes.data?.products;
         if (!sp || sp.length === 0) return { wcId: p.id, name: p.name, sku, status: 'UNMATCHED', price: p.price || '0', instock: 0, reserved: 0, brand: null };
-        const sd = sp.find(s => String(s.code) === sku) || sp[0];
+        const sd = sp.find(s => String(s.code) === apiSku) || sp[0];
         return { wcId: p.id, name: p.name, sku, status: 'UNMATCHED', price: sd.price ?? p.price ?? '0', instock: sd.instock ?? 0, reserved: sd.reserved ?? 0, brand: null };
       } catch (e) {
         return { wcId: p.id, name: p.name, sku, status: 'UNMATCHED', price: p.price || '0', instock: 0, reserved: 0, brand: null };
